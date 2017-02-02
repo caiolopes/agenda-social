@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
-    "bootbot": "^1.0.7"
+    "async": "^2.1.4",
+    "axios": "^0.15.3",
+    "bootbot": "^1.0.7",
+    "fb": "^1.1.1",
+    "node-fetch": "^1.6.3"
   },
   "devDependencies": {},
   "scripts": {
