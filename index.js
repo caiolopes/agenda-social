@@ -55,6 +55,30 @@ bot.on('attachment', (payload, chat) => {
 
 });
 
+bot.on('postback:MENU_FIND', (payload, chat) => {
+    chat.conversation((convo) => {
+        convo.ask(`Digite sua localização:`, findLocation);
+    });
+});
+
+
+const findLocation = (payload, convo) => {
+    const text = payload.message.text;
+    bot.getLocation(encodeURIComponent(text)).then((res) => {
+        console.log(res);
+        var adress = res.results[0].formatted_address;
+        console.log(adress);
+        convo.say({
+            text: 'Sua localização é ' + adress + '?',
+            quickReplies: [
+                { content_type: 'text', title: 'Sim', payload: 'ADRESS_SIM' },
+                { content_type: 'text', title: 'Não', payload: 'ADRESS_NAO' }
+            ]
+        }, { typing: true });
+    });
+}
+
+
 
 bot.hear(['Olá', 'Oi', /eai( there)?/i], (payload, chat) => {
     console.log('Aplicando!');
@@ -69,6 +93,7 @@ bot.hear(['Olá', 'Oi', /eai( there)?/i], (payload, chat) => {
         }, { typing: true });
     });
 });
+
 
 bot.on('quick_reply:INICIO_SIM', (payload, chat) => {
     chat.getUserProfile().then((user) => {
