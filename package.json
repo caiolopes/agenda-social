@@ -1,0 +1,23 @@
+{
+  "name": "colabore-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "bootbot": "^1.0.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caiolopes/colabore-bot.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/caiolopes/colabore-bot/issues"
+  },
+  "homepage": "https://github.com/caiolopes/colabore-bot#readme"
+}
