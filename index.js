@@ -74,9 +74,15 @@ bot.on('attachment', (payload, chat) => {
 });
 
 bot.on('postback:MENU_FIND', (payload, chat) => {
-  chat.conversation((convo) => {
-    convo.ask(`Digite sua localização:`, findLocation);
-  });
+  const userId = payload.sender.id; 
+  const found = USERS.find(elem => elem._id === userId);
+  if (!found) {
+    chat.conversation((convo) => {
+      convo.ask(`Digite sua localização:`, findLocation);
+    });
+  } else {
+    bot.emit('postback:ONG_EVENT', payload, chat);
+  }
 });
 
 
@@ -84,15 +90,12 @@ const findLocation = (payload, convo) => {
   const userId = payload.sender.id;
   const text = payload.message.text;
   getLocation(encodeURIComponent(text)).then((res) => {
-    console.log(res);
     var address = res.results[0].formatted_address;
     const found = USERS.find(elem => elem._id === userId);
     if (!found) {
       USERS.push({ _id: payload.sender.id, address });
     } else {
-      USERS = USERS.filter(elem => { 
-        elem._id === userId
-      });
+      USERS = USERS.filter(elem => elem._id !== userId);
       USERS.push({ _id: payload.sender.id, address });
     }
     console.log(USERS);
@@ -168,6 +171,23 @@ bot.on('postback:ONG_EVENT', (payload, chat) => {
   });
 });
 
+bot.on('postback:ONG_ABOUT', (payload, chat) => {
+  const ongName = payload.postback.payload.split(':')[1];
+  console.log(ongName);
+  FB.api(
+    `/${ongName}`,
+    'GET',
+    {"fields":"about"},
+    function (response) {
+      if (response.about && response.about.length > 6) {
+        chat.say(response.about, { typing: true });
+      } else {
+        chat.say('Infelizmente não sei muito sobre essa instituição!');
+      }
+    }
+  );
+});
+
 bot.on('quick_reply:ADRESS_SIM', (payload, chat) => {
   const userId = payload.sender.id;
   const requests = ONGs.map((ong) => {
@@ -190,12 +210,12 @@ bot.on('quick_reply:ADRESS_SIM', (payload, chat) => {
         image_url,
         buttons: [{
           type: "postback",
-          title: `Eventos`,
-          payload: "ONG_EVENT:" + ONGs[i]
+          title: `Sobre`,
+          payload: `ONG_ABOUT:${ONGs[i]}`
         }, {
           type: "postback",
           title: `Eventos`,
-          payload: "EVENT_EVENT"
+          payload: `ONG_EVENT: ${ONGs[i]}`
         }]
       });
     });
