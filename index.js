@@ -121,9 +121,7 @@ const findLocation = (payload, convo) => {
 
 bot.on('attachment', (payload, chat) => { });
 
-bot.hear(['Olá', 'Oi', /eai( there)?/i], (payload, chat) => {
-  console.log('Aplicando!');
-
+bot.hear(['Olá', 'Oi', 'começar', 'comecar'], (payload, chat) => {
   chat.getUserProfile().then((user) => {
     chat.say({
       text: `Olá ${user.first_name}, você gostaria de colaborar e fazer a diferença no mundo?`,
@@ -133,6 +131,10 @@ bot.hear(['Olá', 'Oi', /eai( there)?/i], (payload, chat) => {
       ]
     }, { typing: true });
   });
+});
+
+bot.hear(['ONGs', 'ongs', 'ong', 'Listar ongs', 'listar ongs', 'Lista de ONGs'], (payload, chat) => {
+  bot.emit('postback:MENU_FIND', payload, chat);
 });
 
 bot.on('quick_reply:INICIO_SIM', (payload, chat) => {
@@ -188,30 +190,29 @@ bot.on('postback:ONG_EVENT', (payload, chat) => {
               }]
           });
         });
-        chat.say(`Aqui está algumas eventos da ong ${ongName} perto de você`).then(() => {
-          chat.sendGenericTemplate(elements, { typing: true });
+        const elemsIndexes = [];
+        requests = [];
+        results.forEach((obj, index) => {
+          if (obj.event.place.location !== undefined) {
+            elemsIndexes.push(index);
+            const lat = obj.event.place.location.latitude;
+            const lon = obj.event.place.location.longitude;
+            let func = function (callback) {
+              getDistance(userId, lat, lon).then((res) => {
+                callback(null, res.rows[0].elements[0].distance.text);
+              });
+            };
+            requests.push(func);
+          };
         });
-        // const elemsIndexes = [];
-        // const reqs = results.map((obj, index) => {
-        //   if (obj.event.place.location !== undefined) {
-        //     elemsIndexes.push(index);
-        //     const lat = obj.event.place.location.latitude;
-        //     const lon = obj.event.place.location.longitude;
-        //     return function (callback) {
-        //       getDistance(userId, lat, lon).then((res) => {
-        //         callback(null, res.rows[0].elements[0].distance.text);
-        //       });
-        //     }
-        //   };
-        // });
-        // async.parallel(reqs, function (err, results) {
-        //   results.forEach((distance, index) => {
-        //     elements[elemsIndexes[index]].title = elements[elemsIndexes[index]].title + ' ' + distance;
-        //   });
-        //   chat.say(`Aqui está algumas eventos da ong ${ongName} perto de você`).then(() => {
-        //     chat.sendGenericTemplate(elements, { typing: true });
-        //   });
-        // });
+        async.parallel(requests, function (err, results) {
+          results.forEach((distance, index) => {
+            elements[elemsIndexes[index]].title = elements[elemsIndexes[index]].title + ' - ' + distance;
+          });
+          chat.say(`Aqui está algumas eventos da ong ${ongName} perto de você`).then(() => {
+            chat.sendGenericTemplate(elements, { typing: true });
+          });
+        });
       });
     });
 });
