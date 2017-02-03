@@ -355,6 +355,7 @@ bot.on('quick_reply:ADDRESS_YES', (payload, chat) => {
   const currentUser = USERS.find(elem => elem._id === userId);
   let requests = [];
   let selectedOngs = [];
+  // console.log('user lat: ' + currentUser.lat + 'user lng: ' + currentUser.lng);
   ONGs.forEach((ong) => {
     let func = function (callback) {
       FB.api(
@@ -366,7 +367,8 @@ bot.on('quick_reply:ADDRESS_YES', (payload, chat) => {
         }
       );
     }
-    if (calculateDistance(currentUser.lat, currentUser.lng, ong.lat, ong.lng) < 50) {
+    // console.log('ong lat: ' + ong.lat + 'ong lng: ' + ong.lng);
+    if (calculateDistance(currentUser.lat, currentUser.lng, ong.lat, ong.lng) <= 60) {
       requests.push(func);
       selectedOngs.push(ong);
     }
