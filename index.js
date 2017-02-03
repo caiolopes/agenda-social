@@ -4,9 +4,8 @@ const BootBot = require('bootbot');
 const config = require('config').get("FacebookBot");
 const async = require('async');
 const fetch = require('node-fetch');
-const open = require('open');
-
-var { FB, FacebookApiException } = require('fb');
+const { FB } = require('fb');
+const calculateDistance = require('./distance');
 
 const bot = new BootBot({
     accessToken: config.get('access_token'),
@@ -18,12 +17,54 @@ const bot = new BootBot({
 // https://www.facebook.com/projetoabraco
 // https://www.facebook.com/ONGArtsol/
 
-const ONGs = ['CadiBrasil', 'ongparaisodosfocinhos', 'amamoscasadeacolhimento', 'projetoabraco', 'ONGArtsol'];
+const ONGs = [
+  // PR
+  { name: 'CADI Brasil', fbId: 'CadiBrasil', lat: -25.6628343, lng: -49.3077648 },
+  // Osasco
+  { name: 'Amamos', fbId: 'amamoscasadeacolhimento', lat: -23.5328871, lng: -46.7919978 },
+  // SP
+  { name: 'Projeto Abraço', fbId: 'projetoabraco', lat: -23.6201553, lng: -46.6513593 },
+  // Bebedouro
+  { name: 'Artsol', fbId: 'ONGArtsol', lat: -20.94967433, lng: -48.4795696 },
+  // Campinas
+  { name: 'Sonhar Acordado', fbId: 'sonharacordadocampinas', lat: -22.9098833, lng: -47.0625812 },
+  // SP
+  { name: 'Sonhar Acordado', fbId: 'ONGSonharAcordadoSP', lat: -23.5505199, lng: -46.63330939999999 },
+  // SP
+  { name: 'Atados', fbId: 'atadosjuntandogenteboa', lat: -23.5505199, lng: -46.63330939999999 },
+  // SP
+  { name: 'Cão sem Dono', fbId: 'caosemdono', lat: -23.5505199, lng: -46.63330939999999 },
+  // Jaguariuna
+  { name: 'Xodó de Bicho', fbId: 'xododebicho', lat: -22.7042272, lng: -46.9855088 },
+];
 
 let USERS = [];
 
-String.prototype.trunc = function(n) {
-    return this.substr(0, n - 1) + (this.length > n ? '...' : '');
+function formatTime(time) {
+  let today = new Date(time);
+  let dd = today.getDate();
+  let mm = today.getMonth() + 1;
+  let minutes = today.getMinutes();
+  let hours = today.getHours();
+
+  let yyyy = today.getFullYear();
+  if (dd < 10) {
+    dd = '0' + dd;
+  }
+  if (mm < 10) {
+    mm = '0' + mm;
+  }
+  if (minutes < 10) {
+    minutes = '0' + minutes;
+  }
+  if (hours < 10) {
+    hours = '0' + hours;
+  }
+  return `${dd}/${mm}/${yyyy} às ${today.getHours()}:${minutes}`;
+}
+
+String.prototype.trunc = function (n) {
+  return this.substr(0, n - 1) + (this.length > n ? '...' : '');
 };
 
 function getLocation(place) {
@@ -41,266 +82,316 @@ function getDistance(userId, lat, lon) {
 
 FB.setAccessToken(config.get('access_token'));
 
+bot.setGreetingText('Você gostaria de saber mais sobre eventos sociais?');
 bot.setGetStartedButton((payload, chat) => {
-    chat.sendGenericTemplate(
-        [{
-            "title": "Olá, sou Contribot, seu assistente por aqui!",
-            "item_url": "https://www.facebook.com/Colabore-239391396508366/",
-            "image_url": "https://images8.alphacoders.com/672/672712.jpg",
-            "subtitle": "Para interagir comigo clique no ícone do menu",
-            "buttons": [{
-                    "type": "postback",
-                    "title": "📜 Lista de ONG's",
-                    "payload": "MENU_FIND"
-                },
-                {
-                    "type": "postback",
-                    "title": "🔍 Encontrar evento",
-                    "payload": "MENU_FIND"
-                }
-            ]
-        }]
-    );
+  console.log('GET_STARTED');
+  chat.sendGenericTemplate([{
+    "title": "Olá, sou Contribot, seu assistente por aqui!",
+    "item_url": "https://www.facebook.com/",
+    "image_url": "https://images8.alphacoders.com/672/672712.jpg",
+    "subtitle": "Para interagir comigo clique no ícone do menu",
+    "buttons": [{
+      "type": "postback",
+      "title": "📖 Lista de ONGs",
+      "payload": "MENU_FIND"
+    }, {
+      "type": "postback",
+      "title": "💬 Encontrar eventos",
+      "payload": "MENU_FIND"
+    }
+    ]
+  }]
+  );
 });
 
 bot.setGreetingText('Quer receber notificações sobre eventos de ONG\'s?');
 bot.setPersistentMenu([{
-        "type": "postback",
-        "title": "📜 Lista de ONG's",
-        "payload": "PERSISTENT_MENU_FIND"
-    },
-    {
-        "type": "postback",
-        "title": "🔍 Encontrar evento",
-        "payload": "PERSISTENT_MENU_FIND"
-    },
-    {
-        "type": "postback",
-        "title": "🏠 Mudar localização",
-        "payload": "PERSISTENT_MENU_LOCATION"
-    }
+  "type": "postback",
+  "title": "📖 Lista de ONGs",
+  "payload": "MENU_FIND"
+},
+{
+  "type": "postback",
+  "title": "💬 Encontrar evento",
+  "payload": "MENU_FIND"
+},
+{
+  "type": "postback",
+  "title": "🏠 Mudar localização",
+  "payload": "PERSISTENT_MENU_LOCATION"
+}
 ]);
 
-
-bot.on('attachment', (payload, chat) => {
-    console.log('APLICANDO');
-});
-
-bot.on('postback:PERSISTENT_MENU_LOCATION', (payload, chat) => {
-    chat.conversation((convo) => {
-        convo.ask(`Mudar sua localização para:`, changeLocation);
-    });
-});
-
-function consult(payload, chat) {
-    console.log(payload);
-    const userId = payload.sender.id;
+const findLocation = (payload, convo) => {
+  const userId = payload.sender.id;
+  const text = payload.message.text;
+  console.log('LOCATION', text);
+  getLocation(text).then((res) => {
+    const address = res.results[0].formatted_address;
+    const lat = res.results[0].geometry.location.lat;
+    const lng = res.results[0].geometry.location.lng;
     const found = USERS.find(elem => elem._id === userId);
     if (!found) {
-        chat.conversation((convo) => {
-            convo.ask(`Digite sua localização:`, findLocation);
-        });
+      USERS.push({ _id: payload.sender.id, address, lat, lng });
     } else {
-        getOngs(payload, chat);
+      USERS = USERS.filter(elem => elem._id !== userId);
+      USERS.push({ _id: payload.sender.id, address, lat, lng });
     }
-}
-
-bot.on('postback:MENU_FIND', (payload, chat) => {
-    consult(payload, chat);
-});
-
-bot.on('postback:PERSISTENT_MENU_FIND', (payload, chat) => {
-    consult(payload, chat);
-});
+    convo.say({
+      text: 'Sua localização é ' + address + '?',
+      quickReplies: [
+        { content_type: 'text', title: 'Sim', payload: 'ADDRESS_YES' },
+        { content_type: 'text', title: 'Não', payload: 'ADDRESS_NO' }
+      ]
+    }, { typing: true });
+  });
+};
 
 const changeLocation = (payload, convo) => {
-    const userId = payload.sender.id;
-    let text = "";
-    if (payload.message.text !== undefined)
-        text = payload.message.text;
-    getLocation(text).then((res) => {
-        var address = res.results[0].formatted_address;
-        convo.say({
-            text: 'Sua localização é ' + address + '?',
-            quickReplies: [
-                { content_type: 'text', title: 'Sim', payload: 'ADRESS_SIM' },
-                { content_type: 'text', title: 'Não', payload: 'ADRESS_NAO' }
-            ]
-        }, { typing: true }).then(() => {
-            convo.end();
-        });
-
+  const text = payload.message.text;
+  const userId = payload.sender.id;
+  if (text.toLowerCase().trim() === 'sim') {
+    USERS = USERS.filter(elem => elem._id !== userId);
+    console.log('USERS', USERS);
+    convo.say('Legal!').then(() => {
+      convo.ask('Qual é o novo endereço?', findLocation);
     });
+  }
 };
 
-const findLocation = (payload, convo) => {
-    const userId = payload.sender.id;
-    let text = "";
-    if (payload.message.text !== undefined)
-        text = payload.message.text;
-    getLocation(text).then((res) => {
-        var address = res.results[0].formatted_address;
-        const found = USERS.find(elem => elem._id === userId);
-        if (!found) {
-            USERS.push({ _id: payload.sender.id, address });
-        } else {
-            USERS = USERS.filter(elem => elem._id !== userId);
-            USERS.push({ _id: payload.sender.id, address });
-        }
-        convo.say({
-            text: 'Sua localização é ' + address + '?',
-            quickReplies: [
-                { content_type: 'text', title: 'Sim', payload: 'ADRESS_SIM' },
-                { content_type: 'text', title: 'Não', payload: 'ADRESS_NAO' }
-            ]
-        }, { typing: true });
-        convo.end();
-    });
-};
+bot.on('postback:PERSISTENT_MENU_LOCATION', (payload, chat) => {
+  chat.conversation((convo) => {
+    convo.ask({
+      text: `Você deseja mudar sua localização?`,
+      quickReplies: ['Sim', 'Não']
+    }, changeLocation);
+  });
+});
 
-bot.on('attachment', (payload, chat) => {});
+bot.on('quick_reply:MENU_FIND', (payload, chat) => {
+  bot.emit('postback:MENU_FIND', payload, chat);
+});
+
+bot.on('postback:MENU_FIND', (payload, chat) => {
+  console.log(JSON.stringify(payload, null, 2));
+  const userId = payload.sender.id;
+  const found = USERS.find(elem => elem._id === userId);
+  if (!found) {
+    chat.conversation((convo) => {
+      convo.ask('Digite sua localização:', findLocation);
+    });
+  } else {
+    bot.emit('quick_reply:ADDRESS_YES', payload, chat);
+  }
+});
+
+bot.on('attachment', (payload, chat) => { });
 
 bot.hear(['Olá', 'Oi', 'começar', 'comecar'], (payload, chat) => {
-    chat.getUserProfile().then((user) => {
-        chat.say({
-            text: `Olá ${user.first_name}, você gostaria de ajudar de alguma forma ONG's próximas de você?`,
-            quickReplies: [
-                { content_type: 'text', title: 'Sim', payload: 'TALK_SIM' },
-                { content_type: 'text', title: 'Não', payload: 'TALK_BYE' },
-            ]
-        }, { typing: true });
-    });
+  chat.getUserProfile().then((user) => {
+    chat.say({
+      text: `Olá ${user.first_name}, você gostaria de colaborar e fazer a diferença no mundo?`,
+      quickReplies: [
+        { content_type: 'text', title: 'Sim', payload: 'START_YES' },
+        { content_type: 'text', title: 'Não', payload: 'START_NO' },
+      ]
+    }, { typing: true });
+  });
 });
 
-bot.on('quick_reply:TALK_SIM', (payload, chat) => {
-    chat.say('Excelente, você pode colaborar participando ou doando para ONG\'s').then(() => {
-        getOngs(payload, chat);
-    });
+bot.hear(['mudar local', 'trocar local'], (payload, chat) => {
+  bot.emit('postback:PERSISTENT_MENU_LOCATION', payload, chat);
 });
 
-bot.on('quick_reply:TALK_BYE', (payload, chat) => {
-    chat.say('Tudo bem, mas não se esqueça que estaremos aqui caso mude de ideia!! ;)', { typing: true });
+bot.hear(['Listar'], (payload, chat) => {
+  bot.emit('postback:MENU_FIND', payload, chat);
 });
 
-bot.hear(['ONGs', 'ongs', 'ong', 'Listar ongs', 'listar ongs', 'Lista de ONGs'], (payload, chat) => {
-    bot.emit('postback:MENU_FIND', payload, chat);
+bot.on('quick_reply:START_YES', (payload, chat) => {
+  console.log('START_YES');
+  chat.getUserProfile().then((user) => {
+    chat.say({
+      text: 'Que legal! Você deseja ver uma lista de ONGs ou eventos próximos a você?',
+      quickReplies: [
+        { content_type: 'text', title: 'ONGs', payload: 'MENU_FIND' },
+        { content_type: 'text', title: 'Eventos', payload: 'MENU_FIND' }
+      ]
+    }, { typing: true });
+  });
 });
 
-bot.on('quick_reply:INICIO_SIM', (payload, chat) => {
-    console.log('INICIO_SIM');
-    chat.getUserProfile().then((user) => {
-        chat.say({
-            text: 'Que legal! Você deseja ver uma lista de ONGs ou eventos próximos a você?',
-            quickReplies: [
-                { content_type: 'text', title: 'ONGs', payload: 'TIPO_ONG' },
-                { content_type: 'text', title: 'Eventos', payload: 'TIPO_EVENTOS' }
-            ]
-        }, { typing: true });
-    });
+bot.on('quick_reply:START_NO', (payload, chat) => {
+  console.log('START_NO');
+  chat.say('Ah, que pena!! Mas tudo bem, assim que você quiser, estarei disponível, só mandar um oi!', { typing: true });
 });
-
-
 
 bot.on('postback:ONG_EVENT', (payload, chat) => {
-    getEvents(payload, chat);
+  const userId = payload.sender.id;
+  const ongName = payload.postback.payload.split(':')[1].trim();
+  const currentUser = USERS.find(elem => elem._id === userId);
+  // if (USERS.length === 0) {
+  //   USERS.push({
+  //     _id: "1237871979633733",
+  //     address: 'Fazenda Rio Grande, PR',
+  //     lat: -25.6628343,
+  //     lng: -49.3077648
+  //   });
+  // }
+  FB.api(
+    `/${ongName}/events`,
+    'GET',
+    { limit: 5, since: new Date().toISOString() },
+    function (response) {
+      let requests = response.data.map((event) => {
+        return function (callback) {
+          FB.api(
+            `/${event.id}/picture`,
+            'GET',
+            { "type": "large", redirect: false },
+            function (response) {
+              callback(null, { event, image_url: response.data.url });
+            }
+          );
+        };
+      });
+      async.parallel(requests, function (err, results) {
+        let elements = [];
+        requests = [];
+        results.forEach((obj) => {
+          if (obj.event.place.location !== undefined) {
+            console.log(obj.event.start_time);
+            console.log(obj.event.end_time);
+            const start_time = formatTime(obj.event.start_time);
+            const end_time = formatTime(obj.event.end_time);
+            elements.push({
+              title: obj.event.name,
+              image_url: obj.image_url,
+              subtitle: `Início ${start_time}\nTérmino ${end_time}`,
+              buttons: [
+                {
+                  type: "web_url",
+                  url: "https://www.facebook.com/events/" + obj.event.id,
+                  title: "Visualizar evento",
+                  webview_height_ratio: "compact"
+                },
+                {
+                  type: "postback",
+                  title: `Descrição completa`,
+                  payload: `ONG_EVENT:${obj.event.id}`
+                }]
+            });
+            const lat = obj.event.place.location.latitude;
+            const lng = obj.event.place.location.longitude;
+            if (currentUser) {
+              let func = function (callback) {
+                getDistance(userId, lat, lng).then((res) => {
+                  callback(null, res.rows[0].elements[0].distance.text);
+                });
+              };
+              requests.push(func);
+            }
+          }
+        });
+        async.parallel(requests, function (err, results) {
+          let count = 0;
+          results.forEach((distance, index) => {
+            if (parseFloat(distance.split(' ')[0]) <= 50.0) {
+              elements[index].subtitle += "\n" + distance.replace('.', ',');
+              count++;
+            } else {
+              elements[index] = null;
+            }
+          });
+          elements = elements.filter(element => element !== null);
+          console.log('COUNT', count);
+          if (count > 0) {
+            chat.say(`Aqui está algumas eventos da ong ${ongName} perto de você`).then(() => {
+              chat.sendGenericTemplate(elements, { typing: true });
+            });
+          } else {
+            chat.say('Uma pena, não temos nenhum evento próximo a você...');
+          }
+        });
+      });
+    });
 });
 
 
 bot.on('postback:ONG_ABOUT', (payload, chat) => {
-    const ongName = payload.postback.payload.split(':')[1];
-    console.log(ongName);
-    FB.api(
-        `/${ongName}`,
-        'GET', { fields: "about" },
-        function(response) {
-            if (response.about && response.about.length > 6) {
-                chat.say(response.about, { typing: true });
-            } else {
-                chat.say('Infelizmente não sei lhe informar muito sobre essa instituição!');
-            }
-        }
-    );
+  const ongName = payload.postback.payload.split(':')[1];
+  console.log(ongName);
+  FB.api(
+    `/${ongName}`,
+    'GET',
+    { fields: "about,description" },
+    function (response) {
+      let message;
+      if (response.about && response.description == null)
+        message = response.about;
+      else if (response.description && response.about == null)
+        message = response.description;
+      else if (response.description && response.about)
+        message = response.about + '.' + response.description;
+      else
+        message = 'Infelizmente não sei muito sobre essa instituição!';
 
+      chat.say(message, { typing: true });
+    }
+  );
 });
 
-function getEvents(payload, chat) {
-    const userId = payload.sender.id;
-    const ongName = payload.postback.payload.split(':')[1].trim();
-    if (!parseInt(ongName)) {
-        FB.api(
-            `/${ongName}/events`,
-            'GET', { limit: 5, since: new Date().toISOString() },
-            function(response) {
-                let requests = response.data.map((event) => {
-                    return function(callback) {
-                        FB.api(
-                            `/${event.id}/picture`,
-                            'GET', { "type": "large", redirect: false },
-                            function(response) {
-                                if (response) {
-                                    callback(null, { event, image_url: response.data.url });
-                                }
-                            }
-                        );
-                    };
-                });
-                async.parallel(requests, function(err, results) {
-                    const elements = [];
-                    results.forEach((obj, i) => {
-                        elements.push({
-                            title: obj.event.name,
-                            image_url: obj.image_url,
-                            subtitle: obj.event.description.trunc(80),
-                            buttons: [{
-                                type: "postback",
-                                title: `Ver detalhes`,
-                                payload: `ONG_EVENT:${obj.event.id}`
-                            }]
-                        });
-                    });
-                    const elemsIndexes = [];
-                    requests = [];
-                    results.forEach((obj, index) => {
-                        if (obj.event.place.location !== undefined) {
-                            elemsIndexes.push(index);
-                            const lat = obj.event.place.location.latitude;
-                            const lon = obj.event.place.location.longitude;
-                            let func = function(callback) {
-                                getDistance(userId, lat, lon).then((res) => {
-                                    callback(null, res.rows[0].elements[0].distance.text);
-                                });
-                            };
-                            requests.push(func);
-                        };
-                    });
-                    async.parallel(requests, function(err, results) {
-                        results.forEach((distance, index) => {
-                            elements[elemsIndexes[index]].title = elements[elemsIndexes[index]].title + ' - ' + distance;
-                        });
-                        chat.say(`Aqui estão alguns eventos da ONG ${ongName} perto de você:`).then(() => {
-                            chat.sendGenericTemplate(elements, { typing: true });
-                        });
-                    });
-                });
-            });
-    } else {
-        console.log('Click em ' + ongName);
-        bot.myemiter('postback:MENU_FIND', payload, chat);
-    }
-}
+bot.on('quick_reply:TALK_SIM', (payload, chat) => {
+  chat.say('Excelente, você pode colaborar participando ou doando para ONG\'s').then(() => {
+    bot.emit('quick_reply:ADDRESS_YES', payload, chat);
+  });
+});
 
-function getOngs(payload, chat) {
-    const userId = payload.sender.id;
-    const requests = ONGs.map((ong) => {
-        return function(callback) {
-            FB.api(
-                `/${ong}/picture`,
-                'GET', { "type": "large", redirect: false },
-                function(response) {
-                    callback(null, response.data.url);
-                }
-            );
+bot.on('quick_reply:TALK_BYE', (payload, chat) => {
+  chat.say('Tudo bem, mas não se esqueça que estaremos aqui caso mude de ideia!! ;)', { typing: true });
+});
+
+bot.on('quick_reply:ADDRESS_YES', (payload, chat) => {
+  const userId = payload.sender.id;
+  const currentUser = USERS.find(elem => elem._id === userId);
+  let requests = [];
+  let selectedOngs = [];
+  ONGs.forEach((ong) => {
+    let func = function (callback) {
+      FB.api(
+        `/${ong.fbId}/picture`,
+        'GET',
+        { "type": "large", redirect: false },
+        function (response) {
+          callback(null, response.data.url);
         }
+      );
+    }
+    if (calculateDistance(currentUser.lat, currentUser.lng, ong.lat, ong.lng) < 50) {
+      requests.push(func);
+      selectedOngs.push(ong);
+    }
+  });
+  async.parallel(requests, function (err, results) {
+    const elements = [];
+    results.forEach((image_url, i) => {
+      elements.push({
+        title: selectedOngs[i].name,
+        image_url,
+        buttons: [{
+          type: "postback",
+          title: `Sobre`,
+          payload: `ONG_ABOUT:${selectedOngs[i].fbId}`
+        }, {
+          type: "web_url",
+          url: "https://www.paypal.com/",
+          title: "Doação",
+          webview_height_ratio: "compact"
+        }, {
+          type: "postback",
+          title: `Eventos`,
+          payload: `ONG_EVENT: ${selectedOngs[i].fbId}`
+        }]
+      });
     });
     async.parallel(requests, function(err, results) {
         const elements = [];
@@ -328,5 +419,29 @@ function getOngs(payload, chat) {
 bot.on('quick_reply:ADRESS_SIM', (payload, chat) => {
     getOngs(payload, chat);
 });
+
+bot.hear([/Eventos da/, /Eventos do/], (payload, chat) => {
+  const ongName = payload.message.text.split(' ')[2];
+  console.log(ongName);
+  payload.postback = {
+    payload: 'ONG_EVENT:' + ongName
+  };
+  bot.emit('postback:ONG_EVENT', payload, chat);
+});
+
+bot.hear([/Sobre/], (payload, chat) => {
+  const ongName = payload.message.text.split(' ')[1];
+  console.log(ongName);
+  payload.postback = {
+    payload: 'ONG_ABOUT:' + ongName
+  };
+  bot.emit('postback:ONG_ABOUT', payload, chat);
+});
+
+
+// bot.on('message', (payload, chat, data) => {
+//   if (data.captured) { return; }
+//   chat.say(`Não entendi sua pergunta!`, { typing: true });
+// });
 
 bot.start(8080);
