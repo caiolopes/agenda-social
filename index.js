@@ -18,6 +18,7 @@ const bot = new BootBot({
 // https://www.facebook.com/ONGArtsol/
 
 const ONGs = [
+  { name: 'RockBicho.org', fbId: '1276897339056454', lat: -23.548880923859, lng: -46.64794921875 },
   // PR
   { name: 'CADI Brasil', fbId: 'CadiBrasil', lat: -25.6628343, lng: -49.3077648 },
   // Osasco
@@ -39,6 +40,8 @@ const ONGs = [
 ];
 
 let USERS = [];
+
+// { id, address, lat, lng, notifications: [{}] }
 
 function formatTime(time) {
   let today = new Date(time);
@@ -86,20 +89,19 @@ bot.setGreetingText('Você gostaria de saber mais sobre eventos sociais?');
 bot.setGetStartedButton((payload, chat) => {
   console.log('GET_STARTED');
   chat.sendGenericTemplate([{
-    "title": "Olá, sou Contribot, seu assistente por aqui!",
-    "item_url": "https://www.facebook.com/",
-    "image_url": "https://images8.alphacoders.com/672/672712.jpg",
+    "title": "Olá, eu sou Collab! Muito prazer. Como posso lhe ajudar?",
+    "image_url": "http://blog.fmh.org/wp-content/uploads/2015/05/Volunteer-Hands-and-Swoosh-011-622x349.png",
     "subtitle": "Para interagir comigo clique no ícone do menu",
     "buttons": [{
       "type": "postback",
-      "title": "📖 Lista de ONGs",
+      "title": "ONGs próximas a mim",
       "payload": "MENU_FIND"
     }, {
-      "type": "postback",
-      "title": "💬 Encontrar eventos",
-      "payload": "MENU_FIND"
-    }
-    ]
+      type: "web_url",
+      url: "http://collab.burrow.io/",
+      title: "Cadastrar nova ONG",
+      webview_height_ratio: "compact"
+    }]
   }]
   );
 });
@@ -109,50 +111,52 @@ bot.setPersistentMenu([{
   "type": "postback",
   "title": "📖 Lista de ONGs",
   "payload": "MENU_FIND"
-},
-{
+}, {
   "type": "postback",
-  "title": "💬 Encontrar evento",
-  "payload": "MENU_FIND"
-},
-{
+  "title": "📒 Notificações",
+  "payload": "MENU_NOTIFICATIONS"
+}, {
   "type": "postback",
   "title": "🏠 Mudar localização",
   "payload": "PERSISTENT_MENU_LOCATION"
-}
-]);
+}]);
 
 const findLocation = (payload, convo) => {
   const userId = payload.sender.id;
-  const text = payload.message.text;
-  console.log('LOCATION', text);
-  getLocation(text).then((res) => {
-    const address = res.results[0].formatted_address;
-    const lat = res.results[0].geometry.location.lat;
-    const lng = res.results[0].geometry.location.lng;
-    const found = USERS.find(elem => elem._id === userId);
-    if (!found) {
-      USERS.push({ _id: payload.sender.id, address, lat, lng });
-    } else {
-      USERS = USERS.filter(elem => elem._id !== userId);
-      USERS.push({ _id: payload.sender.id, address, lat, lng });
-    }
-    convo.say({
-      text: 'Sua localização é ' + address + '?',
-      quickReplies: [
-        { content_type: 'text', title: 'Sim', payload: 'ADDRESS_YES' },
-        { content_type: 'text', title: 'Não', payload: 'ADDRESS_NO' }
-      ]
-    }, { typing: true });
-  });
+  if (payload !== undefined && payload.message !== undefined && payload.message.text !== undefined) {
+    const text = payload.message.text;
+    console.log('LOCATION', text);
+    getLocation(text).then((res) => {
+      const address = res.results[0].formatted_address;
+      const lat = res.results[0].geometry.location.lat;
+      const lng = res.results[0].geometry.location.lng;
+      const found = USERS.find(elem => elem._id === userId);
+      if (!found) {
+        USERS.push({ _id: payload.sender.id, address, lat, lng });
+      } else {
+        found.address = address;
+        found.lat = lat;
+        found.lng = lng;
+      }
+      convo.say({
+        text: 'Sua localização é ' + address + '?',
+        quickReplies: [
+          { content_type: 'text', title: 'Sim', payload: 'ADDRESS_YES' },
+          { content_type: 'text', title: 'Não', payload: 'ADDRESS_NO' }
+        ]
+      }, { typing: true });
+    });
+  } else {
+    convo.say('Tive problemas em achar sua localização').then(() => {
+       convo.say('Você pode tentar novamente?');
+       convo.end();
+    });
+  }
 };
 
 const changeLocation = (payload, convo) => {
   const text = payload.message.text;
-  const userId = payload.sender.id;
   if (text.toLowerCase().trim() === 'sim') {
-    USERS = USERS.filter(elem => elem._id !== userId);
-    console.log('USERS', USERS);
     convo.say('Legal!').then(() => {
       convo.ask('Qual é o novo endereço?', findLocation);
     });
@@ -210,24 +214,27 @@ bot.hear(['Listar'], (payload, chat) => {
 bot.on('quick_reply:START_YES', (payload, chat) => {
   console.log('START_YES');
   chat.getUserProfile().then((user) => {
-    chat.say({
-      text: 'Que legal! Você deseja ver uma lista de ONGs ou eventos próximos a você?',
-      quickReplies: [
-        { content_type: 'text', title: 'ONGs', payload: 'MENU_FIND' },
-        { content_type: 'text', title: 'Eventos', payload: 'MENU_FIND' }
-      ]
-    }, { typing: true });
+    chat.say(`Que legal ${user.first_name}! 😄`).then(() => {
+      chat.say({
+        text: 'Você quer ver uma lista de ONGs próximas a você?',
+        quickReplies: [
+          { content_type: 'text', title: 'Claro', payload: 'MENU_FIND' },
+          { content_type: 'text', title: 'Não posso agora', payload: 'START_NO' }
+        ]
+      }, { typing: true });
+    });
   });
 });
 
 bot.on('quick_reply:START_NO', (payload, chat) => {
   console.log('START_NO');
-  chat.say('Ah, que pena!! Mas tudo bem, assim que você quiser, estarei disponível, só mandar um oi!', { typing: true });
+  chat.say('Ah, que pena! Mas tudo bem, assim que você quiser, estarei disponível, só mandar um oi!', { typing: true });
 });
 
 bot.on('postback:ONG_EVENT', (payload, chat) => {
   const userId = payload.sender.id;
-  const ongName = payload.postback.payload.split(':')[1].trim();
+  const ongId = payload.postback.payload.split(':')[1].trim();
+  const ongObj = ONGs.find(ong => ong.fbId === ongId);
   const currentUser = USERS.find(elem => elem._id === userId);
   // if (USERS.length === 0) {
   //   USERS.push({
@@ -238,7 +245,7 @@ bot.on('postback:ONG_EVENT', (payload, chat) => {
   //   });
   // }
   FB.api(
-    `/${ongName}/events`,
+    `/${ongId}/events`,
     'GET',
     { limit: 5, since: new Date().toISOString() },
     function (response) {
@@ -276,8 +283,8 @@ bot.on('postback:ONG_EVENT', (payload, chat) => {
                 },
                 {
                   type: "postback",
-                  title: `Descrição completa`,
-                  payload: `ONG_EVENT:${obj.event.id}`
+                  title: `Notificar-me`,
+                  payload: `EVENT_NOTIFY:${obj.event.id}:${obj.event.name}`
                 }]
             });
             const lat = obj.event.place.location.latitude;
@@ -305,21 +312,69 @@ bot.on('postback:ONG_EVENT', (payload, chat) => {
           elements = elements.filter(element => element !== null);
           console.log('COUNT', count);
           if (count > 0) {
-            chat.say(`Aqui está algumas eventos da ong ${ongName} perto de você`).then(() => {
+            chat.say(`Aqui estão alguns eventos da ONG ${ongObj.name} perto de você.`).then(() => {
               chat.sendGenericTemplate(elements, { typing: true });
             });
           } else {
-            chat.say('Uma pena, não temos nenhum evento próximo a você...');
+            chat.say('Uma pena... 😔').then(() => {
+              chat.say('Esta ONG não tem nenhum evento planejado pro momento...', { typing: true });
+            });
           }
         });
       });
     });
 });
 
+const notifyEvent = (payload, convo) => {
+  const userId = payload.sender.id;
+  const text = payload.message.text;
+  if (text.toLowerCase().trim() === 'sim') {
+    const currentUser = USERS.find(elem => elem._id === userId);
+    if (currentUser.notifications === undefined) {
+      currentUser.notifications = [];
+    }
+    const eventName = convo.get('eventName');
+    const eventId = convo.get('eventId');
+    currentUser.notifications.push({ fbId: eventId, name: eventName });
+    console.log(JSON.stringify(currentUser, null, 2));
+    convo.say('OK! Você será notificado. 😉 ⏰', { typing: true });
+  }
+  convo.end();
+};
+
+bot.on('postback:EVENT_NOTIFY', (payload, chat) => {
+  const eventId = payload.postback.payload.split(':')[1].trim();
+  const eventName = payload.postback.payload.split(':')[2].trim();
+  chat.getUserProfile().then((user) => {
+    chat.conversation((convo) => {
+      convo.set('eventName', eventName);
+      convo.set('eventId', eventId);
+      convo.ask({
+        text: `${user.first_name}, você confirma que deseja ser notificado do evento ${eventName}?`,
+        quickReplies: ['Sim', 'Não']
+      }, notifyEvent, { typing: true });
+    });
+  });
+});
+
+bot.on('postback:MENU_NOTIFICATIONS', (payload, chat) => {
+  const userId = payload.sender.id;
+  const currentUser = USERS.find(elem => elem._id === userId);
+  if (currentUser.notifications === undefined) {
+    currentUser.notifications = [];
+  }
+  chat.getUserProfile().then((user) => {
+    let text = `${user.first_name}, você tem os seguintes eventos:`;
+    currentUser.notifications.forEach((event) => {
+      text += `\nNome: ${event.name}`;
+    });
+    chat.say(text, { typing: true });
+  });
+});
 
 bot.on('postback:ONG_ABOUT', (payload, chat) => {
   const ongName = payload.postback.payload.split(':')[1];
-  console.log(ongName);
+  console.log('ONG_ABOUT');
   FB.api(
     `/${ongName}`,
     'GET',
@@ -395,26 +450,8 @@ bot.on('quick_reply:ADDRESS_YES', (payload, chat) => {
         }]
       });
     });
-    async.parallel(requests, function(err, results) {
-        const elements = [];
-        results.forEach((image_url, i) => {
-            elements.push({
-                title: ONGs[i],
-                image_url,
-                buttons: [{
-                    type: "postback",
-                    title: `Sobre`,
-                    payload: `ONG_ABOUT:${ONGs[i]}`
-                }, {
-                    type: "postback",
-                    title: `Eventos`,
-                    payload: `ONG_EVENT:${ONGs[i]}`
-                }]
-            });
-        });
-        chat.say('Aqui estão algumas ONGs próximas a você:').then(() => {
-            chat.sendGenericTemplate(elements, { typing: true });
-        });
+    chat.say('Aqui estão algumas ONGs próximas a você').then(() => {
+      chat.sendGenericTemplate(elements, { typing: true });
     });
 }
 
