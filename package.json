@@ -8,24 +8,23 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
-    "node": "7.5.0"
+    "node": "7.4.0"
   },
   "dependencies": {
     "async": "^2.1.4",
-    "bootbot": "^1.0.7",
-    "config": "^1.25.1",
+    "body-parser": "^1.15.2",
+    "config": "^1.21.0",
+    "eventemitter3": "^1.2.0",
+    "express": "^4.14.0",
     "fb": "^1.1.1",
-    "node-fetch": "^1.6.3"
+    "node-fetch": "^1.5.3"
   },
   "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/caiolopes/colabore-bot.git"
+    "url": "https://www.github.com/caiolopes/agenda-social"
   },
+  "keywords": [],
   "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/caiolopes/agenda-social/issues"
-  },
-  "homepage": "https://github.com/caiolopes/agenda-social"
+  "license": "ISC"
 }

@@ -1,6 +1,6 @@
 'use strict';
 
-const BootBot = require('bootbot');
+const BootBot = require('./libs/bootbot/BootBot');
 const config = require('config');
 const async = require('async');
 const fetch = require('node-fetch');
