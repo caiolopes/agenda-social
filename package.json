@@ -1,19 +1,23 @@
 {
-  "name": "colabore-bot",
+  "name": "agenda-social",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": "7.5.0"
+  },
   "dependencies": {
     "async": "^2.1.4",
     "bootbot": "^1.0.7",
+    "config": "^1.25.1",
     "fb": "^1.1.1",
-    "node-fetch": "^1.6.3",
-    "open": "0.0.5"
+    "node-fetch": "^1.6.3"
   },
   "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/caiolopes/colabore-bot.git"
@@ -21,7 +25,7 @@
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/caiolopes/colabore-bot/issues"
+    "url": "https://github.com/caiolopes/agenda-social/issues"
   },
-  "homepage": "https://github.com/caiolopes/colabore-bot#readme"
+  "homepage": "https://github.com/caiolopes/agenda-social"
 }

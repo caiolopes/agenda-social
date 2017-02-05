@@ -1,11 +1,17 @@
 'use strict';
 
 const BootBot = require('bootbot');
-const config = require('config').get("FacebookBot");
+const config = require('config');
 const async = require('async');
 const fetch = require('node-fetch');
 const { FB } = require('fb');
+
 const calculateDistance = require('./distance');
+
+const env = process.env.NODE_ENV || 'development';
+if (env === 'development') {
+   process.env.PORT = 3000;
+}
 
 const bot = new BootBot({
     accessToken: config.get('access_token'),
@@ -453,10 +459,7 @@ bot.on('quick_reply:ADDRESS_YES', (payload, chat) => {
     chat.say('Aqui estão algumas ONGs próximas a você').then(() => {
       chat.sendGenericTemplate(elements, { typing: true });
     });
-}
-
-bot.on('quick_reply:ADRESS_SIM', (payload, chat) => {
-    getOngs(payload, chat);
+  });
 });
 
 bot.hear([/Eventos da/, /Eventos do/], (payload, chat) => {
@@ -483,4 +486,4 @@ bot.hear([/Sobre/], (payload, chat) => {
 //   chat.say(`Não entendi sua pergunta!`, { typing: true });
 // });
 
-bot.start(8080);
+bot.start(process.env.PORT);
